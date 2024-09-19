@@ -1,12 +1,12 @@
 package com.hoanght.repository;
 
-import com.hoanght.entity.Person;
+import com.hoanght.entity.User;
 import org.springframework.data.repository.CrudRepository;
 
 import java.util.Optional;
 
-public interface UserRepository extends CrudRepository<Person, Long> {
-    Optional<Person> findByUsername(String username);
+public interface UserRepository extends CrudRepository<User, Long> {
+    Optional<User> findByUsername(String username);
 
     boolean existsByUsername(String username);
 }

@@ -1,16 +1,13 @@
 package com.hoanght.service.authentication;
 
-import com.hoanght.common.RoleName;
 import com.hoanght.dto.AuthResponse;
 import com.hoanght.dto.LoginRequest;
 import com.hoanght.dto.RegistrationRequest;
-import com.hoanght.entity.Person;
 import com.hoanght.entity.Role;
 import com.hoanght.entity.User;
-import com.hoanght.repository.RoleRepository;
+import com.hoanght.entity.UserDetailsImpl;
 import com.hoanght.repository.UserRepository;
 import com.hoanght.service.jwt.JwtUtils;
-import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,8 +19,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Set;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -32,23 +27,22 @@ public class AuthenticationService {
     private final BCryptPasswordEncoder bCryptPasswordEncoder;
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
 
     public AuthResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsernameOrEmail(), request.getPassword()));
+                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        User user = (User) authentication.getPrincipal();
+        UserDetailsImpl userDetailsImpl = (UserDetailsImpl) authentication.getPrincipal();
 
-        String accessToken = jwtUtils.generateAccessToken(user.getUsername());
-        String refreshToken = jwtUtils.generateRefreshToken(user.getUsername());
+        String accessToken = jwtUtils.generateAccessToken(userDetailsImpl.getUsername());
+        String refreshToken = jwtUtils.generateRefreshToken(userDetailsImpl.getUsername());
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
-                .roles(user.getAuthorities().stream().map(Role::getName).toList())
+                .roles(userDetailsImpl.getAuthorities().stream().map(Role::getName).toList())
                 .build();
     }
 
@@ -57,14 +51,13 @@ public class AuthenticationService {
             return false;
         }
 
-        Person register = Person.builder()
+        User register = User.builder()
                 .fullname(request.getFullname())
                 .username(request.getUsername())
                 .password(bCryptPasswordEncoder.encode(request.getPassword()))
                 .isEnable(true).build();
 
         userRepository.save(register);
-
         return true;
     }
 
@@ -85,44 +78,17 @@ public class AuthenticationService {
                 .build();
     }
 
-    public void logout(HttpServletRequest request) {
-        String token = jwtUtils.getToken(request);
-        jwtUtils.deleteRefreshToken(token);
-    }
-
-    public AuthResponse profile(User user) {
+    public AuthResponse profile(UserDetailsImpl userDetailsImpl) {
         return AuthResponse.builder()
-                .accessToken(jwtUtils.generateAccessToken(user.getUsername()))
-                .refreshToken(jwtUtils.generateRefreshToken(user.getUsername()))
+                .accessToken(jwtUtils.generateAccessToken(userDetailsImpl.getUsername()))
+                .refreshToken(jwtUtils.generateRefreshToken(userDetailsImpl.getUsername()))
                 .tokenType("Bearer")
-                .roles(user.getAuthorities().stream().map(Role::getName).toList())
+                .roles(userDetailsImpl.getAuthorities().stream().map(Role::getName).toList())
                 .build();
     }
 
-    @PostConstruct
-    public void init() {
-        if (!roleRepository.existsByName(RoleName.ROLE_ADMIN)) {
-            roleRepository.save(Role.builder().name(RoleName.ROLE_ADMIN).build());
-        }
-
-        if (!roleRepository.existsByName(RoleName.ROLE_USER)) {
-            roleRepository.save(Role.builder().name(RoleName.ROLE_USER).build());
-        }
-
-        if (!userRepository.existsByUsername("admin")) {
-            Person admin = Person.builder()
-                    .username("admin")
-                    .password(bCryptPasswordEncoder.encode("admin123"))
-                    .fullname("Admin")
-                    .isEnable(true).build();
-
-            Role adminRole = roleRepository.findByName(RoleName.ROLE_ADMIN)
-                    .orElseThrow(() -> new RuntimeException("Role not found"));
-            Role userRole = roleRepository.findByName(RoleName.ROLE_USER)
-                    .orElseThrow(() -> new RuntimeException("Role not found"));
-
-            admin.setRoles(Set.of(adminRole, userRole));
-            userRepository.save(admin);
-        }
+    public void logout(HttpServletRequest request) {
+        String token = jwtUtils.getToken(request);
+        jwtUtils.deleteRefreshToken(token);
     }
 }

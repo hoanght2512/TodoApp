@@ -1,52 +1,43 @@
 package com.hoanght.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.*;
 
-import lombok.Data;
-import org.springframework.security.core.userdetails.UserDetails;
+import java.util.HashSet;
+import java.util.Set;
 
-import java.util.Collection;
+@Getter
+@Setter
+@Entity
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Table(name = "users")
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false)
+    private Long id;
 
-@Data
-public class User implements UserDetails {
-    private final Person person;
+    @Column(name = "username", unique = true)
+    private String username;
 
-    public User(Person person) {
-        this.person = person;
-    }
+    @Column(name = "password")
+    private String password;
 
-    @Override
-    public Collection<Role> getAuthorities() {
-        return person.getRoles();
-    }
+    @Column(name = "fullname")
+    private String fullname;
 
-    @Override
-    public String getPassword() {
-        return person.getPassword();
-    }
+    @Column(name = "email", unique = true)
+    private String email;
 
-    @Override
-    public String getUsername() {
-        return person.getUsername();
-    }
+    @JsonIgnore
+    @ManyToMany(cascade = CascadeType.MERGE, fetch = FetchType.EAGER)
+    @Enumerated(EnumType.STRING)
+    @JoinTable(name = "authorities", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
+    Set<Role> roles = new HashSet<>();
 
-    @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isAccountNonLocked() {
-        return true;
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return person.getIsEnable();
-    }
+    @Column(name = "is_enable", nullable = false)
+    private Boolean isEnable = true;
 }
-

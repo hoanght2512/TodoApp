@@ -1,15 +1,13 @@
 package com.hoanght.service.authentication;
 
-import com.hoanght.entity.Person;
 import com.hoanght.entity.User;
+import com.hoanght.entity.UserDetailsImpl;
 import com.hoanght.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -18,8 +16,8 @@ public class UserDetailService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) {
-        Optional<Person> user = userRepository.findByUsername(username);
-        if (user.isEmpty()) throw new UsernameNotFoundException("User not found");
-        return new User(user.get());
+        User user = userRepository.findByUsername(username).orElseThrow(
+                () -> new UsernameNotFoundException("User Not Found with username: " + username));
+        return new UserDetailsImpl(user);
     }
 }

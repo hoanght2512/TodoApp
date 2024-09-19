@@ -1,9 +1,18 @@
 package com.hoanght.config;
 
+import com.hoanght.common.RoleName;
+import com.hoanght.entity.Role;
+import com.hoanght.entity.User;
+import com.hoanght.repository.RoleRepository;
+import com.hoanght.repository.UserRepository;
 import com.hoanght.service.authentication.UserDetailService;
-import com.hoanght.service.jwt.JwtAuthenticationFilter;
+import com.hoanght.service.jwt.AuthEntryPointJwt;
+import com.hoanght.service.jwt.JwtTokenFilter;
 import com.hoanght.service.jwt.JwtUtils;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -19,13 +28,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.util.Set;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity(jsr250Enabled = true, securedEnabled = true)
 @RequiredArgsConstructor
 public class SecurityConfiguration {
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfiguration.class);
     private final JwtUtils jwtUtils;
+    private final AuthEntryPointJwt unauthorizedHandler;
     private final UserDetailService userDetailService;
 
     @Bean
@@ -43,8 +55,8 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter() {
-        return new JwtAuthenticationFilter(jwtUtils, userDetailService);
+    public JwtTokenFilter jwtAuthenticationFilter() {
+        return new JwtTokenFilter(jwtUtils, userDetailService);
     }
 
     @Bean
@@ -53,14 +65,33 @@ public class SecurityConfiguration {
         http.cors(AbstractHttpConfigurer::disable);
 
         http.authorizeHttpRequests(
-                httpRequest -> httpRequest
-                        .requestMatchers("/auth/**").permitAll()
-                        .anyRequest().authenticated());
-
+                request -> request.requestMatchers("/api/auth/**").permitAll().requestMatchers("/api/admin/**").hasRole(
+                        "ADMIN").requestMatchers("/api/user/**").hasAnyRole("USER",
+                                                                            "ADMIN").anyRequest().authenticated());
+        http.exceptionHandling(e -> e.authenticationEntryPoint(unauthorizedHandler));
         http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
-
         http.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
         return http.build();
+    }
+
+    @Bean
+    public CommandLineRunner initData(UserRepository userRepository, RoleRepository roleRepository) {
+        return args -> {
+            Role userRole = roleRepository.findByName(RoleName.ROLE_USER).orElseGet(
+                    () -> roleRepository.save(new Role(RoleName.ROLE_USER)));
+            Role adminRole = roleRepository.findByName(RoleName.ROLE_ADMIN).orElseGet(
+                    () -> roleRepository.save(new Role(RoleName.ROLE_ADMIN)));
+
+            if (!userRepository.existsByUsername("admin")) {
+                userRepository.save(
+                        User.builder()
+                                .fullname("Administator")
+                                .username("admin")
+                                .password(bCryptPasswordEncoder().encode("123456"))
+                                .isEnable(true)
+                                .roles(Set.of(userRole, adminRole)).build());
+            }
+        };
     }
 }

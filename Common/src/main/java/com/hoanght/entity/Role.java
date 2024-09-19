@@ -26,10 +26,14 @@ public class Role implements GrantedAuthority {
 
     @JsonIgnore
     @ManyToMany(mappedBy = "roles", cascade = CascadeType.MERGE)
-    private List<Person> people;
+    private List<User> people;
 
     @Override
     public String getAuthority() {
         return name.toString();
+    }
+
+    public Role(RoleName roleName) {
+        this.name = roleName;
     }
 }
